@@ -1,6 +1,7 @@
 package com.example.mycurrentlocation;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -19,6 +20,7 @@ import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
@@ -27,14 +29,17 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.common.reflect.TypeToken;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.gson.Gson;
 
 import java.lang.reflect.Type;
@@ -76,15 +81,15 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
     private final String TAG = "MainActivity";
     private FieldValue timestamp;
     FirebaseFirestore db = FirebaseFirestore.getInstance();
-    // String name  = Build.BOARD.length()+"" + Build.BRAND + Build.DEVICE + Build.DISPLAY.length() % 10 + Build.HOST.length() % 10 + Build.ID.length() % 10 + Build.MANUFACTURER.length() % 10 + Build.MODEL.length() % 10 + Build.PRODUCT.length() % 10+ Build.TAGS.length() % 10 + Build.TYPE + Build.USER.length() % 10;
-    String name = "j";
+     String name  = Build.BOARD.length()+"" + Build.BRAND + Build.DEVICE + Build.DISPLAY.length() % 10 + Build.HOST.length() % 10 + Build.ID.length() % 10 + Build.MANUFACTURER.length() % 10 + Build.MODEL.length() % 10 + Build.PRODUCT.length() % 10+ Build.TAGS.length() % 10 + Build.TYPE + Build.USER.length() % 10;
+
 
     Gson gson;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+//        setContentView(R.layout.activity_main);
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         textView_location = findViewById(R.id.text_location);
@@ -106,7 +111,7 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
         try {
             locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 5, MainActivity.this);
-            Pusher();
+            Data_Push();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -127,7 +132,7 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
             Geocoder geocoder = new Geocoder(MainActivity.this, Locale.getDefault());
             List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
             String address = addresses.get(0).getAddressLine(0);
-            textView_location.setText(address);
+          //  textView_location.setText(address);
             String accurateCollection = address.substring(0, address.indexOf(','));
             collections = accurateCollection;
         } catch (Exception e) {
@@ -136,14 +141,55 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
 
     }
 
+    public void Data_Push()
+    {
+        Long tsLong = System.currentTimeMillis() / 1000;
+        String ts = tsLong.toString();
+        myTime = ts.substring(0, ts.length() - 2);
+        Map<String, Object> docData = new HashMap<>();
 
 
-    public void Pusher() {
+        docData.put(name, FieldValue.serverTimestamp());
+        db.collection(collections).document(documents)
+                .update(docData)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        Log.d(TAG, "DocumentSnapshot successfully written!");
+                        Fetcher();
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Log.w(TAG, "Error writing document", e);
+                    }
+                });
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   /* public void Pusher() {
 
         Long tsLong = System.currentTimeMillis() / 1000;
         String ts = tsLong.toString();
         myTime = ts.substring(0, ts.length() - 2);
-        Log.e(TAG, "MY TIME = " + myTime);
+       // Log.e(TAG, "MY TIME = " + myTime);
         // Create a Map to store the data we want to set
         Map<String, Object> docData = new HashMap<>();
 
@@ -151,13 +197,11 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
         docData.put(name, FieldValue.serverTimestamp());
 
 
-        x.add("" + Math.random());
-
 // Add a new document (asynchronously) in collection "cities" with id "LA"
-        Task<Void> future = db.collection(collections).document(documents).update(docData).addOnSuccessListener(new OnSuccessListener<Void>() {
+        Task<Void> future = db.collection("X").document("Y").update(docData).addOnSuccessListener(new OnSuccessListener<Void>() {
             @Override
             public void onSuccess(Void aVoid) {
-                //  Log.e(TAG,"SUCCESS");
+                 Log.e(TAG,"SUCCESS");
 
                 fetchUpdates();
             }
@@ -169,9 +213,16 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
             }
         });
 
-        data.add(""+Math.random());
-        saveListInLocal(data, "X");
-    }
+
+        // getting saved Data
+        ArrayList<String> previousData = getListFromLocal("X");
+        // Editing saved Data
+        previousData.add(""+Math.random());
+        // Displaying edited Data
+        //   System.out.println(previousData.toString());
+        // Saving edited Data
+        saveListInLocal(previousData,"X");
+    }*/
 
 
     public void saveListInLocal(ArrayList<String> list, String key) {
@@ -200,41 +251,35 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
     public void Display()
     {
         ArrayList<String > DATA = getListFromLocal("X");
-        Log.e(TAG,""+DATA.toString());
+       // Log.e(TAG,""+DATA.toString());
+    }
+
+    public void Fetcher()
+    {
+        final DocumentReference docRef = db.collection(collections).document(documents);
+        docRef.addSnapshotListener(new EventListener<DocumentSnapshot>() {
+            @Override
+            public void onEvent(@Nullable DocumentSnapshot snapshot,
+                                @Nullable FirebaseFirestoreException e) {
+                if (e != null) {
+                    Log.w(TAG, "Listen failed.", e);
+                    return;
+                }
+
+                if (snapshot != null && snapshot.exists()) {
+                    Log.d(TAG, "Current data: " + snapshot.getData());
+                } else {
+                    Log.d(TAG, "Current data: null");
+                }
+            }
+        });
+
+
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     public void fetchUpdates() {
+       Log.e(TAG,"reached fetchUpdates");
         DocumentReference mDocRef = FirebaseFirestore.getInstance().collection(collections).document(documents);
         mDocRef.get().addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
             @Override
@@ -255,7 +300,8 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
                         if (finalTime.equals(myTime)) {
 
                             if ((!(key).equals(name))) {
-                                USERS = "/" + key;
+
+                                Log.e(TAG,"KEY "+key+ "Time = "+ finalTime);
 
                             }
 
