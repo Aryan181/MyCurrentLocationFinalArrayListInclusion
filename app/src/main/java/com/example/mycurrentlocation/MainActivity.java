@@ -24,12 +24,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -58,7 +58,7 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
     ArrayList<String> x = new ArrayList<>();
     ArrayList<String> users = new ArrayList<>();
     String mainData;
-    int totalCount;
+    int totalCount = 0 ;
     String saveData;
     String text;
     ArrayList<String> data = new ArrayList<>();
@@ -66,7 +66,7 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
     String documents;
     String latitude;
     String longitude;
-
+    ArrayList<String> oldData = new ArrayList<>();
     String myTime;
     String finalTime;
     SharedPreferences shared;
@@ -80,16 +80,17 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
     LocationManager locationManager;
     private final String TAG = "MainActivity";
     private FieldValue timestamp;
-    FirebaseFirestore db = FirebaseFirestore.getInstance();
-     String name  = Build.BOARD.length()+"" + Build.BRAND + Build.DEVICE + Build.DISPLAY.length() % 10 + Build.HOST.length() % 10 + Build.ID.length() % 10 + Build.MANUFACTURER.length() % 10 + Build.MODEL.length() % 10 + Build.PRODUCT.length() % 10+ Build.TAGS.length() % 10 + Build.TYPE + Build.USER.length() % 10;
 
-
+     //String name  = Build.BOARD.length()+"" + Build.BRAND + Build.DEVICE + Build.DISPLAY.length() % 10 + Build.HOST.length() % 10 + Build.ID.length() % 10 + Build.MANUFACTURER.length() % 10 + Build.MODEL.length() % 10 + Build.PRODUCT.length() % 10+ Build.TAGS.length() % 10 + Build.TYPE + Build.USER.length() % 10;
+    String name = "3";
+    private SharedPreferences prefs;
+    private SharedPreferences.Editor edit;
     Gson gson;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-//        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main);
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         textView_location = findViewById(R.id.text_location);
@@ -101,6 +102,20 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
                     Manifest.permission.ACCESS_FINE_LOCATION
             }, 100);
         }
+        prefs = getPreferences(Context.MODE_PRIVATE);
+        edit = prefs.edit();
+        totalCount = prefs.getInt("counter", 0);
+        totalCount++;
+        edit.putInt("counter", totalCount);
+        edit.commit();
+        button_location = (Button) findViewById(R.id.button_location);//get id of button 1
+        button_location.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+            }
+        });
+
 
     }
 
@@ -111,7 +126,7 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
         try {
             locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 5, MainActivity.this);
-            Data_Push();
+            Pusher();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -132,7 +147,7 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
             Geocoder geocoder = new Geocoder(MainActivity.this, Locale.getDefault());
             List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
             String address = addresses.get(0).getAddressLine(0);
-          //  textView_location.setText(address);
+            textView_location.setText(address);
             String accurateCollection = address.substring(0, address.indexOf(','));
             collections = accurateCollection;
         } catch (Exception e) {
@@ -141,55 +156,12 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
 
     }
 
-    public void Data_Push()
-    {
+    public void Pusher() {
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
         Long tsLong = System.currentTimeMillis() / 1000;
         String ts = tsLong.toString();
         myTime = ts.substring(0, ts.length() - 2);
-        Map<String, Object> docData = new HashMap<>();
-
-
-        docData.put(name, FieldValue.serverTimestamp());
-        db.collection(collections).document(documents)
-                .update(docData)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        Log.d(TAG, "DocumentSnapshot successfully written!");
-                        Fetcher();
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.w(TAG, "Error writing document", e);
-                    }
-                });
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-   /* public void Pusher() {
-
-        Long tsLong = System.currentTimeMillis() / 1000;
-        String ts = tsLong.toString();
-        myTime = ts.substring(0, ts.length() - 2);
-       // Log.e(TAG, "MY TIME = " + myTime);
+      //  Log.e(TAG, "MY TIME = " + myTime);
         // Create a Map to store the data we want to set
         Map<String, Object> docData = new HashMap<>();
 
@@ -197,13 +169,32 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
         docData.put(name, FieldValue.serverTimestamp());
 
 
-// Add a new document (asynchronously) in collection "cities" with id "LA"
-        Task<Void> future = db.collection("X").document("Y").update(docData).addOnSuccessListener(new OnSuccessListener<Void>() {
+        if(totalCount==1) {
+            Task<Void> future = db.collection(collections).document(documents).set(docData).addOnSuccessListener(new OnSuccessListener<Void>() {
+
+
+                @Override
+                public void onSuccess(Void aVoid) {
+                    //  Log.e(TAG,"SUCCESS");
+
+                    FetchData();
+                }
+            }).addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                    Log.e(TAG, "fail");
+
+                }
+            });
+        }
+        Task<Void> future = db.collection(collections).document(documents).update(docData).addOnSuccessListener(new OnSuccessListener<Void>() {
+
+
             @Override
             public void onSuccess(Void aVoid) {
-                 Log.e(TAG,"SUCCESS");
+                //  Log.e(TAG,"SUCCESS");
 
-                fetchUpdates();
+                FetchData();
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
@@ -213,16 +204,80 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
             }
         });
 
+    }
+    public void FetchData()
+    {
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        final DocumentReference docRef = db.collection(collections).document(documents);
+        docRef.addSnapshotListener(new EventListener<DocumentSnapshot>() {
+            @Override
+            public void onEvent(@Nullable DocumentSnapshot snapshot,
+                                @Nullable FirebaseFirestoreException e) {
+                if (e != null) {
+                    Log.w(TAG, "Listen failed.", e);
+                    return;
+                }
 
-        // getting saved Data
-        ArrayList<String> previousData = getListFromLocal("X");
-        // Editing saved Data
-        previousData.add(""+Math.random());
-        // Displaying edited Data
-        //   System.out.println(previousData.toString());
-        // Saving edited Data
-        saveListInLocal(previousData,"X");
-    }*/
+                if (snapshot != null && snapshot.exists()) {
+                  //  Log.d(TAG, "Current data: " + snapshot.getData());
+
+                    Map<String, Object> dataPulled = snapshot.getData();
+
+                    Set<Map.Entry<String, Object>> entrySet = dataPulled.entrySet();
+                  //  Log.e(TAG,"loop begins");
+                    for (Map.Entry<String, Object> entry : entrySet) {
+                        String key = entry.getKey();
+                        String s = valueOf(entry.getValue());
+                        String unformattedTime = s;
+                        if ((unformattedTime.contains("=") && (unformattedTime.contains("=")))) {
+                          //  Log.e(TAG, "" + unformattedTime);
+                            String formatTime = unformattedTime.substring(unformattedTime.indexOf('=') + 1, unformattedTime.indexOf(','));
+                            String finalTime = formatTime.substring(0, formatTime.length() - 2);
+                          //  Log.e(TAG, " time "+finalTime);
+                           // Log.e(TAG,"My time = "+myTime);
+                            if (finalTime.equals(myTime)) {
+                              //  Log.e(TAG,"Loop continues with this person = "+key);
+
+                                if (!((key).equals(name))) {
+                                  //  Log.e(TAG, "Data to be stored =>" + key);
+                                    DataSaver(key);
+                                }
+
+
+                            }
+
+                        }
+                    }
+
+                } else {
+                    Log.d(TAG, "Current data: null");
+                }
+            }
+        });
+
+
+    }
+
+public void DataSaver(String data)
+{
+
+    Log.e(TAG, "Data Storage ");
+    if(totalCount == 1) {
+        saveListInLocal(oldData, "X");
+    }
+    oldData  = getListFromLocal("X");
+
+    if(totalCount==1) {
+        oldData.add(data);
+    }
+    if((totalCount!=1)&&(!(oldData.contains(data))))
+    {
+        oldData.add(data);
+    }
+    Log.e(TAG,oldData.toString());
+    saveListInLocal(oldData,"X");
+
+}
 
 
     public void saveListInLocal(ArrayList<String> list, String key) {
@@ -243,86 +298,22 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
         Gson gson = new Gson();
         String json = prefs.getString("X", null);
         Type type = new TypeToken<ArrayList<String>>() {}.getType();
-
         return gson.fromJson(json, type);
 
     }
 
-    public void Display()
+    public void DisplayCurrentData()
     {
-        ArrayList<String > DATA = getListFromLocal("X");
-       // Log.e(TAG,""+DATA.toString());
-    }
-
-    public void Fetcher()
-    {
-        final DocumentReference docRef = db.collection(collections).document(documents);
-        docRef.addSnapshotListener(new EventListener<DocumentSnapshot>() {
-            @Override
-            public void onEvent(@Nullable DocumentSnapshot snapshot,
-                                @Nullable FirebaseFirestoreException e) {
-                if (e != null) {
-                    Log.w(TAG, "Listen failed.", e);
-                    return;
-                }
-
-                if (snapshot != null && snapshot.exists()) {
-                    Log.d(TAG, "Current data: " + snapshot.getData());
-                } else {
-                    Log.d(TAG, "Current data: null");
-                }
-            }
-        });
-
-
+       if(totalCount>3) {
+           Log.e(TAG, "Here is the current data =>");
+           ArrayList<String> data = getListFromLocal("X");
+           Log.e(TAG, data.toString());
+       }
     }
 
 
-    public void fetchUpdates() {
-       Log.e(TAG,"reached fetchUpdates");
-        DocumentReference mDocRef = FirebaseFirestore.getInstance().collection(collections).document(documents);
-        mDocRef.get().addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
-            @Override
-            public void onSuccess(DocumentSnapshot documentSnapshot) {
-                Map<String, Object> dataPulled = documentSnapshot.getData();
-
-                Set<Map.Entry<String, Object>> entrySet = dataPulled.entrySet();
-
-                for (Map.Entry<String, Object> entry : entrySet) {
-                    String key = entry.getKey();
-                    String s = valueOf(entry.getValue());
-                    String unformattedTime = s;
-                    if ((unformattedTime.contains("=") && (unformattedTime.contains("=")))) {
-                        //  Log.e(TAG, "" + unformattedTime);
-                        String formatTime = unformattedTime.substring(unformattedTime.indexOf('=') + 1, unformattedTime.indexOf(','));
-                        String finalTime = formatTime.substring(0, formatTime.length() - 2);
-                        // Log.e(TAG, " time "+finalTime);
-                        if (finalTime.equals(myTime)) {
-
-                            if ((!(key).equals(name))) {
-
-                                Log.e(TAG,"KEY "+key+ "Time = "+ finalTime);
-
-                            }
-
-                        }
-                    }
-
-                }
 
 
-            }
-
-
-        }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception e) {
-                Log.d("TAG", "FAIL");
-            }
-        });
-
-
-    }
 
 
 
@@ -346,7 +337,7 @@ public class MainActivity<sensorManager> extends AppCompatActivity implements Lo
     public void onSensorChanged(SensorEvent event) {
         if (running) {
             getLocation();
-            Display();
+            DisplayCurrentData();
         }
 
 
